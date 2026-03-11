@@ -1,0 +1,29 @@
+- name: Installer le paquet ifenslave (nécessaire pour le bonding)
+  apt:
+    name: ifenslave
+    state: present
+    update_cache: yes
+
+- name: Activer le module noyau bonding
+  modprobe:
+    name: bonding
+    state: present
+
+- name: Ajouter la configuration du bonding dans /etc/network/interfaces
+  blockinfile:
+    path: /etc/network/interfaces
+    marker: "# {mark} CONFIGURATION BONDING ANSIBLE"
+    block: |
+      auto bond0
+      iface bond0 inet static
+          address 192.168.30.100
+          netmask 255.255.255.0
+          bond-slaves ens34 ens35
+          bond-mode 802.3ad
+          bond-miimon 100
+          bond-lacp-rate fast
+
+- name: Redémarrer le service réseau pour appliquer le bonding
+  systemd:
+    name: networking
+    state: restarted

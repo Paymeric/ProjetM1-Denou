@@ -3,3 +3,10 @@
   become: yes
   roles:
     - nfs_serveur
+
+- name: Déploiement du Serveur NFS
+  hosts: serveur
+  become: yes
+  roles:
+    - bonding_serveur
+    - nfs_serveur
