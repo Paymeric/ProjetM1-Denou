@@ -1,0 +1,31 @@
+---
+- name: Configuration L2 de switch1 et switch2
+  hosts: switchs
+  gather_facts: no
+  become: no
+
+  tasks:
+    - name: Configuration + commit sur switch1
+      raw: >
+        printf '%s\n' '{{ ansible_ssh_pass }}' | sudo -S bash -lc '
+        net add bond bond0 bond slaves swp2,swp3 &&
+        net add bond bond0 bond mode 802.3ad &&
+        net add bridge bridge ports swp1,swp4,bond0 &&
+        net add bridge bridge vids 10,30 &&
+        net add interface swp1 bridge access 10 &&
+        net add bond bond0 bridge access 30 &&
+        net add interface swp4 bridge vids 10,30 &&
+        net commit
+        '
+      when: inventory_hostname == "switch1"
+
+    - name: Configuration + commit sur switch2
+      raw: >
+        printf '%s\n' '{{ ansible_ssh_pass }}' | sudo -S bash -lc '
+        net add bridge bridge ports swp1,swp2 &&
+        net add bridge bridge vids 20 &&
+        net add interface swp1 bridge access 20 &&
+        net add interface swp2 bridge vids 20 &&
+        net commit
+        '
+      when: inventory_hostname == "switch2"
