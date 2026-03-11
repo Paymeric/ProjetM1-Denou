@@ -1,0 +1,19 @@
+- name: Installer le paquet client NFS
+  apt:
+    name: nfs-common
+    state: present
+    update_cache: yes
+
+- name: Créer le point de montage local spécifique
+  file:
+    path: "/{{ inventory_hostname }}"
+    state: directory
+    mode: '0777'
+
+- name: Configurer /etc/fstab et monter le dossier NFS
+  mount:
+    path: "/{{ inventory_hostname }}"
+    src: "192.168.30.100:/{{ inventory_hostname }}"
+    fstype: nfs4
+    opts: "rw,sync,hard,_netdev"
+    state: mounted

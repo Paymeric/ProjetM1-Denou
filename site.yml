@@ -10,3 +10,9 @@
   roles:
     - bonding_serveur
     - nfs_serveur
+
+- name: Configuration des Clients NFS
+  hosts: clients
+  become: yes
+  roles:
+    - nfs_client
