@@ -1,0 +1,34 @@
+- name: Installer le paquet du serveur NFS
+  apt:
+    name: nfs-kernel-server
+    state: present
+    update_cache: yes
+
+- name: Créer le dossier de partage exclusif pour Machine 1
+  file:
+    path: /machine1
+    state: directory
+    mode: '0777'
+    owner: nobody
+    group: nogroup
+
+- name: Créer le dossier de partage exclusif pour Machine 2
+  file:
+    path: /machine2
+    state: directory
+    mode: '0777'
+    owner: nobody
+    group: nogroup
+
+- name: Configurer les autorisations d'accès dans /etc/exports
+  copy:
+    dest: /etc/exports
+    content: |
+      /machine1 192.168.10.1(rw,sync,no_subtree_check)
+      /machine2 192.168.20.1(rw,sync,no_subtree_check)
+
+- name: Appliquer la configuration et redémarrer le service NFS
+  service:
+    name: nfs-kernel-server
+    state: restarted
+    enabled: yes

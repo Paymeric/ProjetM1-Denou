@@ -1,0 +1,5 @@
+- name: Déploiement du Serveur NFS
+  hosts: serveur
+  become: yes
+  roles:
+    - nfs_serveur
