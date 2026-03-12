@@ -1,19 +1,32 @@
-- name: Installer le paquet ifenslave (nécessaire pour le bonding)
+- name: Installer le paquet ifenslave pour le bonding
   apt:
     name: ifenslave
     state: present
     update_cache: yes
 
-- name: Activer le module noyau bonding
+- name: Charger le module kernel bonding
   modprobe:
     name: bonding
     state: present
+
+- name: Ajouter le module bonding au démarrage
+  lineinfile:
+    path: /etc/modules
+    line: "bonding"
 
 - name: Ajouter la configuration du bonding dans /etc/network/interfaces
   blockinfile:
     path: /etc/network/interfaces
     marker: "# {mark} CONFIGURATION BONDING ANSIBLE"
     block: |
+      auto ens34
+      iface ens34 inet manual
+          bond-master bond0
+
+      auto ens35
+      iface ens35 inet manual
+          bond-master bond0
+
       auto bond0
       iface bond0 inet static
           address 192.168.30.100
@@ -22,8 +35,27 @@
           bond-mode 802.3ad
           bond-miimon 100
           bond-lacp-rate fast
+          up ip route add 192.168.10.0/24 via 192.168.30.254 dev bond0
+          up ip route add 192.168.20.0/24 via 192.168.30.254 dev bond0
 
 - name: Redémarrer le service réseau pour appliquer le bonding
-  systemd:
-    name: networking
-    state: restarted
+  shell: |
+    ifdown ens34 ens35 bond0 || true
+    ifup ens34 ens35 bond0
+  ignore_errors: yes
+
+- name: Application forcee de la configuration reseau
+  shell: |
+    ip link set ens34 down || true
+    ip link set ens35 down || true
+    ip link set bond0 down || true
+
+    ip link delete bond0 || true
+
+    systemctl restart networking
+
+    ifup ens34 || true
+    ifup ens35 || true
+    ifup bond0 || true
+  become: yes
+  ignore_errors: yes
