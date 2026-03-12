@@ -40,4 +40,4 @@
     src: "192.168.30.100:/{{ inventory_hostname }}"
     fstype: nfs4
     opts: "rw,sync,hard,_netdev"
-    state: present
+    state: mounted
