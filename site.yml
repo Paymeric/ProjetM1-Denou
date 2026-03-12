@@ -1,18 +1,19 @@
-- name: Déploiement du Serveur NFS
-  hosts: serveur
-  become: yes
+---
+- hosts: switch1,switch2
+  gather_facts: no
   roles:
-    - nfs_serveur
+    - cumulus_l2
 
-- name: Déploiement du Serveur NFS
-  hosts: serveur
-  become: yes
+- hosts: switch3
+  gather_facts: no
+  roles:
+    - cumulus_l3
+
+- hosts: serveur_nfs
   roles:
     - bonding_serveur
     - nfs_serveur
 
-- name: Configuration des Clients NFS
-  hosts: clients
-  become: yes
+- hosts: machine1,machine2
   roles:
     - nfs_client

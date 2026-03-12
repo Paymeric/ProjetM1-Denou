@@ -1,0 +1,24 @@
+---
+- name: Configurer le bridge, les VLANs et les IPs sur switch3
+  raw: >
+    echo '{{ ansible_ssh_pass }}' | sudo -S bash -lc '
+    net add bridge bridge ports swp1,swp2 &&
+    net add bridge bridge vids 10,20,30 &&
+    net add interface swp1 bridge vids 10,30 &&
+    net add interface swp2 bridge vids 20 &&
+    net add vlan 10 ip address 192.168.10.254/24 &&
+    net add vlan 20 ip address 192.168.20.254/24 &&
+    net add vlan 30 ip address 192.168.30.254/24 &&
+    net commit
+    '
+
+- name: Créer le fichier ACL d'isolation entre M1 et M2
+  raw: >
+    echo '{{ ansible_ssh_pass }}' | sudo -S bash -lc 'printf "%s\n" "[iptables]"
+    "-A FORWARD -s 192.168.10.0/24 -d 192.168.20.0/24 -j DROP"
+    "-A FORWARD -s 192.168.20.0/24 -d 192.168.10.0/24 -j DROP"
+    > /etc/cumulus/acl/policy.d/50_intervlan_block.rules'
+
+- name: Appliquer les ACLs
+  raw: >
+    echo '{{ ansible_ssh_pass }}' | sudo -S cl-acltool -i
