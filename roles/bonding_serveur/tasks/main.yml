@@ -54,8 +54,6 @@
 
     systemctl restart networking
 
-    ifup ens34 || true
-    ifup ens35 || true
     ifup bond0 || true
   become: yes
   ignore_errors: yes
