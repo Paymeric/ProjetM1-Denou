@@ -1,0 +1,9 @@
+---
+- name: Configuration normale des switchs (Pont L2)
+  hosts: switchs
+  become: yes
+  tasks:
+    - name: Créer le pont L2 et ajouter les interfaces (STP actif par défaut)
+      shell: |
+        net add bridge bridge ports swp1,swp2,swp3
+        net commit
