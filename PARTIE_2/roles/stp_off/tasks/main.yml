@@ -1,0 +1,10 @@
+---
+- name: Création du pont L2 et configuration des ports
+  shell: |
+    net add bridge bridge ports swp1,swp2,swp3
+    net commit
+
+- name: Désactiver le STP pour forcer la boucle réseau
+  shell: |
+    net add bridge stp off
+    net commit
