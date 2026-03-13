@@ -1,0 +1,7 @@
+---
+- name: Activer et forcer le RSTP (Rapid Spanning Tree 802.1w)
+  shell: |
+    net del bridge stp off || true
+    net add bridge bridge mstpctl-forcevers rstp
+    net commit
+    mstpctl setforcevers bridge rstp

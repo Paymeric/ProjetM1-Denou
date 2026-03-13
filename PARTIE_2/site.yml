@@ -19,3 +19,10 @@
   tags: stp_on
   roles:
     - stp_on
+
+- name: Lancer la réactivation en mode RAPIDE (RSTP)
+  hosts: switchs
+  become: yes
+  tags: rstp_on
+  roles:
+    - rstp_on
