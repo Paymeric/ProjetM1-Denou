@@ -1,1 +1,6 @@
-test
+---
+- name: Configurer les IP des 3 machines sur ens34
+  hosts: machines
+  become: true
+  roles:
+    - config_ips_machines

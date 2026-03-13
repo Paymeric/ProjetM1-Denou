@@ -30,16 +30,19 @@
   when: inventory_hostname == "machine3"
 
 - name: Supprimer les anciennes IP de ens34
-  shell: ip addr flush dev ens34
+  command: ip addr flush dev ens34
 
 - name: Appliquer l'IP sur ens34 pour machine1
-  shell: ip addr add 192.168.10.21/24 dev ens34 && ip link set ens34 up
+  command: ip addr add 192.168.10.21/24 dev ens34
   when: inventory_hostname == "machine1"
 
 - name: Appliquer l'IP sur ens34 pour machine2
-  shell: ip addr add 192.168.10.22/24 dev ens34 && ip link set ens34 up
+  command: ip addr add 192.168.10.22/24 dev ens34
   when: inventory_hostname == "machine2"
 
 - name: Appliquer l'IP sur ens34 pour machine3
-  shell: ip addr add 192.168.10.23/24 dev ens34 && ip link set ens34 up
+  command: ip addr add 192.168.10.23/24 dev ens34
   when: inventory_hostname == "machine3"
+
+- name: Activer ens34
+  command: ip link set ens34 up
