@@ -2,5 +2,20 @@
 - name: Configurer les IP des 3 machines sur ens34
   hosts: machines
   become: true
+  tags: ip
   roles:
     - config_ips_machines
+
+- name: Lancer la désactivation du STP
+  hosts: switchs
+  become: yes
+  tags: stp_off
+  roles:
+    - stp_off
+
+- name: Lancer la réactivation du STP
+  hosts: switchs
+  become: yes
+  tags: stp_on
+  roles:
+    - stp_on

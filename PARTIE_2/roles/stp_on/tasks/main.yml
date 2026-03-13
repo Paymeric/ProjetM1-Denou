@@ -1,0 +1,7 @@
+---
+- name: Réactiver le STP et forcer la version Classique (802.1D)
+  shell: |
+    net del bridge stp off
+    net add bridge bridge mstpctl-forcevers stp
+    net commit
+    mstpctl setforcevers bridge stp
