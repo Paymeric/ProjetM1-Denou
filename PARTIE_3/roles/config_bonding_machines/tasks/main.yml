@@ -1,12 +1,4 @@
 ---
-- name: Installer les paquets nécessaires
-  apt:
-    name:
-      - ifenslave
-      - vlan
-    state: present
-    update_cache: yes
-
 - name: Charger le module bonding
   modprobe:
     name: bonding
@@ -33,27 +25,23 @@
       iface ens33 inet static
           address 10.0.0.41/24
 
-      auto ens34
+      allow-hotplug ens34
       iface ens34 inet manual
           bond-master bond0
 
-      auto ens35
+      allow-hotplug ens35
       iface ens35 inet manual
           bond-master bond0
 
       auto bond0
-      iface bond0 inet manual
+      iface bond0 inet static
+          address 192.168.1.1/24
+          gateway 192.168.1.254
           bond-mode 802.3ad
           bond-miimon 100
           bond-lacp-rate 1
           bond-slaves ens34 ens35
           bond-xmit-hash-policy layer3+4
-
-      auto bond0.10
-      iface bond0.10 inet static
-          address 192.168.1.1/24
-          gateway 192.168.1.254
-          vlan-raw-device bond0
   when: inventory_hostname == "machine1"
 
 - name: Configurer /etc/network/interfaces pour machine2
@@ -72,27 +60,23 @@
       iface ens33 inet static
           address 10.0.0.42/24
 
-      auto ens34
+      allow-hotplug ens34
       iface ens34 inet manual
           bond-master bond0
 
-      auto ens35
+      allow-hotplug ens35
       iface ens35 inet manual
           bond-master bond0
 
       auto bond0
-      iface bond0 inet manual
+      iface bond0 inet static
+          address 192.168.2.1/24
+          gateway 192.168.2.254
           bond-mode 802.3ad
           bond-miimon 100
           bond-lacp-rate 1
           bond-slaves ens34 ens35
           bond-xmit-hash-policy layer3+4
-
-      auto bond0.20
-      iface bond0.20 inet static
-          address 192.168.2.1/24
-          gateway 192.168.2.254
-          vlan-raw-device bond0
   when: inventory_hostname == "machine2"
 
 - name: Redémarrer le réseau
