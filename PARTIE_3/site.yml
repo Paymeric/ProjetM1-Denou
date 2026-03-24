@@ -1,5 +1,6 @@
 ---
 - hosts: clag_switches
+  become: true
   gather_facts: no
   roles:
     - config_clag
