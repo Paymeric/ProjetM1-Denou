@@ -1,0 +1,206 @@
+---
+###############################################################################
+# Playbook : Configuration MLAG Switch 1 & Switch 2 - Cumulus Linux 4.3
+#
+# Topologie :
+#   Machine1 (ens34→swp1-sw1, ens35→swp1-sw2)  VLAN10 : 192.168.1.0/24
+#   Machine2 (ens34→swp2-sw2, ens35→swp2-sw1)  VLAN20 : 192.168.2.0/24
+#   sw1 <-> sw2 : peerlink sur swp4 + swp5 (MLAG peer)
+#   sw1-swp3 -> switch3  /  sw2-swp3 -> switch3  (uplinks indépendants)
+#
+# Résultat : si sw1 ou sw2 tombe, le trafic M1<->M2 continue sans interruption
+###############################################################################
+
+- name: "Configuration MLAG - Switch 1 & Switch 2 (Cumulus 4.3)"
+  hosts: clag_switches
+  become: true
+  gather_facts: false
+
+  vars:
+    # VLAN utilisés dans l'infrastructure
+    vlan_m1: 10          # VLAN Machine 1
+    vlan_m2: 20          # VLAN Machine 2
+    vlan_peerlink: 4094  # VLAN interne MLAG (peerlink)
+
+    # Interfaces de peerlink (liaison inter-switch sw1<->sw2)
+    peerlink_members:
+      - swp4
+      - swp5
+
+    # MAC système partagée MLAG (identique sur les deux switches)
+    mlag_sys_mac: "44:38:39:FF:01:01"
+
+    # Interfaces uplink vers Switch3
+    uplink_sw3: swp3
+
+    # Interfaces vers les machines
+    port_machine1: swp1   # M1S1 (sw1) / M1S2 (sw2)
+    port_machine2: swp2   # M2S1 (sw1) / M2S2 (sw2)
+
+  ###########################################################################
+  # ÉTAPE 0 : Vérification de la connectivité
+  ###########################################################################
+  pre_tasks:
+    - name: "Ping de vérification vers le switch"
+      ansible.builtin.ping:
+      register: ping_result
+
+    - name: "Affichage du résultat de connectivité"
+      ansible.builtin.debug:
+        msg: "Switch {{ inventory_hostname }} ({{ ansible_host }}) est joignable."
+      when: ping_result is succeeded
+
+  ###########################################################################
+  # ÉTAPE 1 : Installation/vérification du paquet ifupdown2
+  ###########################################################################
+  tasks:
+    - name: "Vérification que ifupdown2 est installé"
+      ansible.builtin.apt:
+        name: ifupdown2
+        state: present
+        update_cache: false
+
+    ###########################################################################
+    # ÉTAPE 2 : Déploiement du fichier /etc/network/interfaces
+    ###########################################################################
+    - name: "Déploiement de la configuration réseau (/etc/network/interfaces)"
+      ansible.builtin.template:
+        src: templates/interfaces.j2
+        dest: /etc/network/interfaces
+        owner: root
+        group: root
+        mode: "0644"
+        backup: true
+        validate: "ifquery -a --syntax-help -i %s"
+      notify: Recharger la configuration réseau
+
+    ###########################################################################
+    # ÉTAPE 3 : Configuration du hostname
+    ###########################################################################
+    - name: "Configuration du hostname"
+      ansible.builtin.hostname:
+        name: "{{ inventory_hostname }}"
+      notify: Redémarrer le service NTP
+
+    - name: "Mise à jour de /etc/hosts"
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.1\.1'
+        line: "127.0.1.1       {{ inventory_hostname }}"
+        state: present
+
+    ###########################################################################
+    # ÉTAPE 4 : Activation et démarrage du daemon CLAG (MLAG)
+    ###########################################################################
+    - name: "Activation du service clagd au démarrage"
+      ansible.builtin.systemd:
+        name: clagd
+        enabled: true
+        state: started
+
+    ###########################################################################
+    # ÉTAPE 5 : Activation du forwarding IPv4 (nécessaire pour le routage L3)
+    ###########################################################################
+    - name: "Activation du forwarding IPv4"
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        state: present
+        sysctl_set: true
+        reload: true
+
+    ###########################################################################
+    # ÉTAPE 6 : Application immédiate de la configuration réseau
+    ###########################################################################
+    - name: "Application de la configuration avec ifreload"
+      ansible.builtin.command: ifreload -a
+      changed_when: true
+      register: ifreload_result
+
+    - name: "Résultat ifreload"
+      ansible.builtin.debug:
+        var: ifreload_result.stdout_lines
+
+    ###########################################################################
+    # ÉTAPE 7 : Vérifications post-déploiement
+    ###########################################################################
+    - name: "Vérification du statut MLAG (clagctl)"
+      ansible.builtin.command: clagctl
+      register: mlag_status
+      changed_when: false
+
+    - name: "Affichage du statut MLAG"
+      ansible.builtin.debug:
+        msg: "{{ mlag_status.stdout_lines }}"
+
+    - name: "Vérification du bond peerlink"
+      ansible.builtin.command: cat /proc/net/bonding/peerlink
+      register: peerlink_status
+      changed_when: false
+
+    - name: "Affichage de l'état du peerlink"
+      ansible.builtin.debug:
+        var: peerlink_status.stdout_lines
+
+    - name: "Vérification des bonds MLAG (bond-m1, bond-m2)"
+      ansible.builtin.command: "bridge link show"
+      register: bridge_status
+      changed_when: false
+
+    - name: "Affichage du bridge"
+      ansible.builtin.debug:
+        var: bridge_status.stdout_lines
+
+    - name: "Vérification des VLANs sur le bridge"
+      ansible.builtin.command: bridge vlan show
+      register: vlan_status
+      changed_when: false
+
+    - name: "Affichage des VLANs"
+      ansible.builtin.debug:
+        var: vlan_status.stdout_lines
+
+  ###########################################################################
+  # HANDLERS
+  ###########################################################################
+  handlers:
+    - name: Recharger la configuration réseau
+      ansible.builtin.command: ifreload -a
+      changed_when: true
+
+    - name: Redémarrer le service NTP
+      ansible.builtin.systemd:
+        name: ntp
+        state: restarted
+      ignore_errors: true
+
+
+###############################################################################
+# Play séparé : vérification de la convergence MLAG (après les deux switches)
+###############################################################################
+- name: "Vérification finale de la convergence MLAG"
+  hosts: access_switches
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: "Attente de la convergence MLAG (30s)"
+      ansible.builtin.pause:
+        seconds: 30
+      run_once: true
+
+    - name: "Vérification état MLAG - peer doit être 'up'"
+      ansible.builtin.command: clagctl
+      register: clag_final
+      changed_when: false
+
+    - name: "Résultat MLAG final"
+      ansible.builtin.debug:
+        msg: "{{ clag_final.stdout_lines }}"
+
+    - name: "Assertion : le peer MLAG doit être en ligne"
+      ansible.builtin.assert:
+        that:
+          - "'peer-state: up' in clag_final.stdout or 'Peer State: up' in clag_final.stdout"
+        fail_msg: "ERREUR : Le peer MLAG n'est pas UP sur {{ inventory_hostname }} !"
+        success_msg: "OK : MLAG opérationnel sur {{ inventory_hostname }}"

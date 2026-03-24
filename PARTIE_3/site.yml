@@ -1,1 +1,5 @@
-test
+---
+- hosts: clag_switches
+  gather_facts: no
+  roles:
+    - config_clag

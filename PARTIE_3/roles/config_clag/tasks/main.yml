@@ -1,1 +1,24 @@
-test
+---
+# tasks file for config_clag
+
+- name: Configurer le MLAG (Peerlink et Bridge) via NCLU
+  nclu:
+    commands:
+      # 1. Création du bond
+      - add bond peerlink bond slaves swp4,swp5
+
+      # 2. Configuration MLAG (CLAG)
+      - add interface peerlink.4094 clag peer-ip linklocal
+      - add interface peerlink.4094 clag sys-mac 44:38:39:FF:00:01
+
+      # Utilisation de variables car ces valeurs changent selon le switch !
+      - add interface peerlink.4094 clag priority {{ clag_priority }}
+      - add interface peerlink.4094 clag backup-ip {{ clag_backup_ip }} vrf mgmt
+
+      # 3. Configuration du Bridge
+      - add bridge bridge ports peerlink
+      - add bridge bridge vlan-aware
+
+    # Commit automatique des changements
+    commit: true
+    description: "Deploiement MLAG par Ansible"
