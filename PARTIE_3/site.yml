@@ -4,3 +4,15 @@
   gather_facts: no
   roles:
     - config_clag
+
+- hosts: machines
+  become: true
+  gather_facts: no
+  roles:
+    - config_bonding_machines
+
+- hosts: routeurs
+  become: true
+  gather_facts: no
+  roles:
+    - config_routage_sw3
