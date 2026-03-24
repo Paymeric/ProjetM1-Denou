@@ -1,31 +1,125 @@
 ---
 # tasks file for config_clag
 
-- name: Configurer le MLAG et les ports du réseau via NCLU
-  nclu:
-    abort: true  # CRUCIAL : Vide les erreurs des tests précédents !
-    commands:
-      # 1. Création de tous les bonds physiques
-      - add bond peerlink bond slaves swp4,swp5
-      - add bond bond-m1 bond slaves swp1
-      - add bond bond-m2 bond slaves swp2
-      
-      # 2. Création du bridge et assignation des ports (AVANT de configurer les VLANs)
-      - add bridge bridge ports peerlink,bond-m1,bond-m2,swp3
-      - add bridge bridge vids 10,20
-      
-      # 3. Paramétrage des VLANs (on utilise le mot 'bond' au lieu de 'interface')
-      - add bond bond-m1 bridge access 10
-      - add bond bond-m2 bridge access 20
-      - add interface swp3 bridge vids 10,20
-      
-      # 4. Configuration de la couche MLAG / CLAG
-      - add interface peerlink.4094 clag peer-ip linklocal
-      - add interface peerlink.4094 clag sys-mac 44:38:39:FF:00:01
-      - add interface peerlink.4094 clag priority {{ clag_priority }}
-      - add interface peerlink.4094 clag backup-ip {{ clag_backup_ip }} vrf mgmt
-      - add bond bond-m1 clag id 1
-      - add bond bond-m2 clag id 2
+- name: Déployer /etc/network/interfaces sur switch1
+  copy:
+    dest: /etc/network/interfaces
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      auto lo
+      iface lo inet loopback
 
-    commit: true
-    description: "Deploiement complet et ordonne MLAG"
+      auto eth0
+      iface eth0
+          address 10.0.0.51/24
+          vrf mgmt
+
+      auto peerlink
+      iface peerlink
+          bond-slaves swp4 swp5
+
+      auto bond-m1
+      iface bond-m1
+          bond-slaves swp1
+          clag-id 1
+          bridge-access 10
+
+      auto bond-m2
+      iface bond-m2
+          bond-slaves swp2
+          clag-id 2
+          bridge-access 20
+
+      auto bridge
+      iface bridge
+          bridge-ports peerlink bond-m1 bond-m2 swp3
+          bridge-vlan-aware yes
+          bridge-vids 10 20
+
+      auto peerlink.4094
+      iface peerlink.4094
+          clagd-peer-ip linklocal
+          clagd-sys-mac 44:38:39:FF:00:01
+          clagd-priority 1000
+          clagd-backup-ip 10.0.0.52 vrf mgmt
+
+      auto mgmt
+      iface mgmt
+          address 127.0.0.1/8
+          address ::1/128
+          vrf-table auto
+  when: inventory_hostname == "switch1"
+
+- name: Déployer /etc/network/interfaces sur switch2
+  copy:
+    dest: /etc/network/interfaces
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      auto lo
+      iface lo inet loopback
+
+      auto eth0
+      iface eth0
+          address 10.0.0.52/24
+          vrf mgmt
+
+      auto peerlink
+      iface peerlink
+          bond-slaves swp4 swp5
+
+      auto bond-m1
+      iface bond-m1
+          bond-slaves swp1
+          clag-id 1
+          bridge-access 10
+
+      auto bond-m2
+      iface bond-m2
+          bond-slaves swp2
+          clag-id 2
+          bridge-access 20
+
+      auto bridge
+      iface bridge
+          bridge-ports peerlink bond-m1 bond-m2 swp3
+          bridge-vlan-aware yes
+          bridge-vids 10 20
+
+      auto peerlink.4094
+      iface peerlink.4094
+          clagd-peer-ip linklocal
+          clagd-sys-mac 44:38:39:FF:00:01
+          clagd-priority 2000
+          clagd-backup-ip 10.0.0.51 vrf mgmt
+
+      auto mgmt
+      iface mgmt
+          address 127.0.0.1/8
+          address ::1/128
+          vrf-table auto
+  when: inventory_hostname == "switch2"
+
+- name: Appliquer la configuration réseau Cumulus
+  shell: ifreload -a
+  args:
+    executable: /bin/bash
+
+- name: Vérifier la config CLAG
+  shell: |
+    net show configuration commands
+    echo "----------------"
+    clagctl
+    echo "----------------"
+    bridge vlan show
+  args:
+    executable: /bin/bash
+  register: clag_check
+  changed_when: false
+
+- name: Afficher la vérification CLAG
+  debug:
+    var: clag_check.stdout
