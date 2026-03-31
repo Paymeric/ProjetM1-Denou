@@ -1,11 +1,26 @@
 ---
-- name: Configurer Switch 3 via NCLU
+- name: Configurer Switch 3 via NCLU pour la redondance de routeur
   shell: |
+    net abort || true
+
     net add bridge bridge vids 10,20 || true
     net add interface swp1 bridge vids 10,20 || true
     net add interface swp2 bridge vids 10,20 || true
-    net add vlan 10 ip address 192.168.1.254/24 || true
-    net add vlan 20 ip address 192.168.2.254/24 || true
+
+    net del vlan 10 ip address 192.168.1.254/24 || true
+    net del vlan 20 ip address 192.168.2.254/24 || true
+
+    net del vlan 10 ip address 192.168.1.252/24 || true
+    net del vlan 20 ip address 192.168.2.252/24 || true
+    net del vlan 10 ip address-virtual 00:00:5E:00:01:10 192.168.1.254/24 || true
+    net del vlan 20 ip address-virtual 00:00:5E:00:01:20 192.168.2.254/24 || true
+
+    net add vlan 10 ip address 192.168.1.252/24 || true
+    net add vlan 20 ip address 192.168.2.252/24 || true
+
+    net add vlan 10 ip address-virtual 00:00:5E:00:01:10 192.168.1.254/24 || true
+    net add vlan 20 ip address-virtual 00:00:5E:00:01:20 192.168.2.254/24 || true
+
     net commit || true
   args:
     executable: /bin/bash
@@ -19,10 +34,12 @@
 - name: Vérifier la configuration du switch 3
   shell: |
     net show configuration
-    echo "----------------"
+    echo "--------------------"
     ip a
-    echo "----------------"
+    echo "--------------------"
     bridge vlan show
+    echo "--------------------"
+    ip route
   args:
     executable: /bin/bash
   register: sw3_check
