@@ -1,45 +1,90 @@
 ---
-- name: Configurer Switch 3 via NCLU pour la redondance de routeur
-  shell: |
-    net abort || true
+- name: Déployer /etc/network/interfaces sur switch3
+  copy:
+    dest: /etc/network/interfaces
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      auto lo
+      iface lo inet loopback
 
-    net add bridge bridge vids 10,20 || true
-    net add interface swp1 bridge vids 10,20 || true
-    net add interface swp2 bridge vids 10,20 || true
+      auto eth0
+      iface eth0
+          address 10.0.0.53/24
+          vrf mgmt
 
-    net del vlan 10 ip address 192.168.1.254/24 || true
-    net del vlan 20 ip address 192.168.2.254/24 || true
+      auto bridge
+      iface bridge
+          bridge-ports swp1 swp2
+          bridge-vlan-aware yes
+          bridge-vids 10 20
 
-    net del vlan 10 ip address 192.168.1.252/24 || true
-    net del vlan 20 ip address 192.168.2.252/24 || true
-    net del vlan 10 ip address-virtual 00:00:5E:00:01:10 192.168.1.254/24 || true
-    net del vlan 20 ip address-virtual 00:00:5E:00:01:20 192.168.2.254/24 || true
+      auto vlan10
+      iface vlan10
+          address 192.168.1.252/24
+          vrrp 10 192.168.1.254/24
+          vlan-id 10
+          vlan-raw-device bridge
 
-    net add vlan 10 ip address 192.168.1.252/24 || true
-    net add vlan 20 ip address 192.168.2.252/24 || true
+      auto vlan20
+      iface vlan20
+          address 192.168.2.252/24
+          vrrp 20 192.168.2.254/24
+          vlan-id 20
+          vlan-raw-device bridge
 
-    net add vlan 10 ip address-virtual 00:00:5E:00:01:10 192.168.1.254/24 || true
-    net add vlan 20 ip address-virtual 00:00:5E:00:01:20 192.168.2.254/24 || true
+      auto mgmt
+      iface mgmt
+          address 127.0.0.1/8
+          address ::1/128
+          vrf-table auto
 
-    net commit || true
+- name: Activer vrrpd dans FRR
+  lineinfile:
+    path: /etc/frr/daemons
+    regexp: '^vrrpd='
+    line: 'vrrpd=yes'
+
+- name: Déployer /etc/frr/frr.conf sur switch3
+  copy:
+    dest: /etc/frr/frr.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      service integrated-vtysh-config
+      !
+      interface vlan10
+       vrrp 10
+       vrrp 10 priority 200
+       vrrp 10 ip 192.168.1.254
+      !
+      interface vlan20
+       vrrp 20
+       vrrp 20 priority 200
+       vrrp 20 ip 192.168.2.254
+      !
+      line vty
+
+- name: Recharger la configuration réseau de switch3
+  shell: ifreload -a
   args:
     executable: /bin/bash
-  register: nclu_config
-  changed_when: true
 
-- name: Afficher le résultat NCLU
-  debug:
-    var: nclu_config.stdout_lines
+- name: Redémarrer FRR sur switch3
+  service:
+    name: frr
+    state: restarted
 
-- name: Vérifier la configuration du switch 3
+- name: Vérifier VRRP sur switch3
   shell: |
-    net show configuration
-    echo "--------------------"
-    ip a
-    echo "--------------------"
-    bridge vlan show
-    echo "--------------------"
-    ip route
+    echo "===== /etc/network/interfaces ====="
+    cat /etc/network/interfaces
+    echo "===== /etc/frr/frr.conf ====="
+    cat /etc/frr/frr.conf
+    echo "===== show vrrp ====="
+    vtysh -c "show vrrp"
   args:
     executable: /bin/bash
   register: sw3_check
@@ -48,3 +93,4 @@
 - name: Afficher la vérification de switch3
   debug:
     var: sw3_check.stdout
+

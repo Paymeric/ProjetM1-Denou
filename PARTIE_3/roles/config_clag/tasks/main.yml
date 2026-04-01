@@ -16,10 +16,6 @@
           address 10.0.0.51/24
           vrf mgmt
 
-      # Nouveau lien vers Switch 4
-      auto eth1
-      iface eth1
-
       auto peerlink
       iface peerlink
           bond-slaves swp4 swp5
@@ -38,7 +34,7 @@
 
       auto bridge
       iface bridge
-          bridge-ports peerlink bond-m1 bond-m2 swp3 eth1
+          bridge-ports peerlink bond-m1 bond-m2 swp3 swp6
           bridge-vlan-aware yes
           bridge-vids 10 20
 
@@ -71,10 +67,6 @@
           address 10.0.0.52/24
           vrf mgmt
 
-      # Nouveau lien vers Switch 4
-      auto eth1
-      iface eth1
-
       auto peerlink
       iface peerlink
           bond-slaves swp4 swp5
@@ -93,7 +85,7 @@
 
       auto bridge
       iface bridge
-          bridge-ports peerlink bond-m1 bond-m2 swp3 eth1
+          bridge-ports peerlink bond-m1 bond-m2 swp3 swp6
           bridge-vlan-aware yes
           bridge-vids 10 20
 
